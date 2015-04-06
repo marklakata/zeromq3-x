@@ -136,7 +136,7 @@ void zmq::tcp_connecter_t::out_event ()
     //  Shut the connecter down.
     terminate ();
 
-    socket->event_connected (endpoint, fd);
+    socket->event_connected(endpoint, (int)fd);
 }
 
 void zmq::tcp_connecter_t::timer_event (int id_)
@@ -314,6 +314,6 @@ void zmq::tcp_connecter_t::close ()
     int rc = ::close (s);
     errno_assert (rc == 0);
 #endif
-    socket->event_closed (endpoint, s);
+    socket->event_closed(endpoint, (int)s);
     s = retired_fd;
 }

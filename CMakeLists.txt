@@ -1,15 +1,25 @@
-# CMake build script for ZeroMQ on Windows
+# CMake build script for ZeroMQ
+# * Full support for Windows
+# * Experimental support for non-Windows static library.
 
 # 2.8.11 provides toolkit support
 # 2.8.11.2 provides MSVC2013 support
 
-cmake_minimum_required (VERSION 2.8.11.2)
-project (ZeroMQ)
+if (CMAKE_HOST_WIN32)
+  cmake_minimum_required (VERSION 2.8.11.2)
+else()
+  cmake_minimum_required (VERSION 2.8.11)
+endif()
 
-include (${CMAKE_SOURCE_DIR}/cmake/Modules/TestZMQVersion.cmake)
+project (ZeroMQ)
 
 option (WITH_DOC "Build Reference Guide documentation (requires DocBook)" OFF)
 option (WITH_OPENPGM "Build with support for OpenPGM" OFF)
+
+if (CMAKE_HOST_WIN32)
+  include (${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/TestZMQVersion.cmake)
+endif()
+
 
 # WARNING: Windows Python will override Cygwin yet not work with Asciidoc.
 #find_package (PythonInterp REQUIRED)
@@ -50,7 +60,7 @@ mark_as_advanced(PYTHON_EXECUTABLE ASCIIDOC_EXECUTABLE)
 #-----------------------------------------------------------------------------
 # force off-tree build
 
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 message(FATAL_ERROR "CMake generation is not allowed within the source directory!
 Remove the CMakeCache.txt file and try again from another folder, e.g.:
 
@@ -59,7 +69,7 @@ Remove the CMakeCache.txt file and try again from another folder, e.g.:
    cd cmake-make
    cmake ..
 ")
-endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+endif(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 
 #-----------------------------------------------------------------------------
 # default to Release build
@@ -76,24 +86,26 @@ set(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
 #-----------------------------------------------------------------------------
 # platform specifics
 
-add_definitions(
+if (CMAKE_HOST_WIN32)
+  add_definitions(
         -DWIN32
 	-DDLL_EXPORT
 # NB: May require tweaking for highly connected applications.
 	-DFD_SETSIZE=1024
 	-D_CRT_SECURE_NO_WARNINGS
-	-D_WIN32_WINNT=${_zmq_WIN32_WINNT}
-)
+#	-D_WIN32_WINNT=${_zmq_WIN32_WINNT}
+  )
 
 # Parallel make.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 
 # Optimization flags.
 # http://msdn.microsoft.com/en-us/magazine/cc301698.aspx
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
-set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} /LTCG")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
+  set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+  set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
+  set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} /LTCG")
+endif()
 
 #-----------------------------------------------------------------------------
 # source files
@@ -202,29 +214,35 @@ endif(WITH_OPENPGM)
 # source generators
 
 foreach (source ${cxx-sources})
-	list(APPEND sources ${CMAKE_SOURCE_DIR}/src/${source})
+	list(APPEND sources ${CMAKE_CURRENT_SOURCE_DIR}/src/${source})
 endforeach()
 
 foreach (source ${rc-sources})
 	list(APPEND sources ${CMAKE_BINARY_DIR}/${source})
-	configure_file(${CMAKE_SOURCE_DIR}/src/${source}.in ${CMAKE_BINARY_DIR}/${source})
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/${source}.in ${CMAKE_BINARY_DIR}/${source})
 endforeach()
+
+if (CMAKE_HOST_WIN32)
+  set(PLATFORM msvc)
+else()
+  set(PLATFORM redhat)
+endif()
 
 add_custom_command(
 	OUTPUT ${CMAKE_BINARY_DIR}/platform.hpp
 	COMMAND ${CMAKE_COMMAND}
 	ARGS	-E
 		copy
-		${CMAKE_SOURCE_DIR}/builds/msvc/platform.hpp
+		${CMAKE_CURRENT_SOURCE_DIR}/builds/${PLATFORM}/platform.hpp
 		${CMAKE_BINARY_DIR}/platform.hpp
-	DEPENDS ${CMAKE_SOURCE_DIR}/builds/msvc/platform.hpp
+	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/builds/${PLATFORM}/platform.hpp
 )
 list(APPEND sources ${CMAKE_BINARY_DIR}/platform.hpp)
 
 if (CMAKE_CL_64)
-	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template64.in)
+	set (nsis-template ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NSIS.template64.in)
 else (CMAKE_CL_64)
-	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template32.in)
+	set (nsis-template ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NSIS.template32.in)
 endif (CMAKE_CL_64)
 add_custom_command(
 	OUTPUT ${CMAKE_BINARY_DIR}/NSIS.template.in
@@ -237,7 +255,7 @@ add_custom_command(
 )
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/doc)
-file(GLOB docs RELATIVE ${CMAKE_BINARY_DIR}/ "${CMAKE_SOURCE_DIR}/doc/*.txt")
+file(GLOB docs RELATIVE ${CMAKE_BINARY_DIR}/ "${CMAKE_CURRENT_SOURCE_DIR}/doc/*.txt")
 set (html-docs)
 foreach (txt ${docs})
 	string (REGEX REPLACE ".*/(.*)\\.txt" "\\1.html" html ${txt})
@@ -250,7 +268,7 @@ foreach (txt ${docs})
 			${ASCIIDOC_EXECUTABLE}
 			-d manpage
 			-b xhtml11
-			-f ${CMAKE_SOURCE_DIR}/doc/asciidoc.conf
+			-f ${CMAKE_CURRENT_SOURCE_DIR}/doc/asciidoc.conf
 			-azmq_version=${ZMQ_VERSION_MAJOR}.${ZMQ_VERSION_MINOR}.${ZMQ_VERSION_PATCH}
 			-o ${dst}
 			${src}
@@ -268,26 +286,30 @@ endforeach (txt ${docs})
 
 message(targetting ${_zmq_TOOLSET})
 
-add_library(libzmq SHARED ${sources} ${html-docs} ${CMAKE_BINARY_DIR}/NSIS.template.in)
-target_link_libraries(libzmq ws2_32.lib rpcrt4.lib ${OPTIONAL_LIBRARIES})
-set_target_properties(libzmq PROPERTIES
+if (CMAKE_HOST_WIN32 AND NOT TARGET libzmq)
+  add_library(libzmq SHARED ${sources} ${html-docs} ${CMAKE_BINARY_DIR}/NSIS.template.in)
+  target_link_libraries(libzmq ws2_32.lib rpcrt4.lib ${OPTIONAL_LIBRARIES})
+  set_target_properties(libzmq PROPERTIES
 	RELEASE_POSTFIX "${_zmq_TOOLSET}-mt-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}"
 	DEBUG_POSTFIX "${_zmq_TOOLSET}-mt-gd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}"
 	PDB_NAME "libzmq${_zmq_TOOLSET}-mt-gd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}"
 	PDB_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
-)
+  ) 
+
 
 #-----------------------------------------------------------------------------
 # installer
 
-install (TARGETS libzmq ARCHIVE DESTINATION lib COMPONENT SDK)
+install (TARGETS libzmq ARCHIVE DESTINATION lib LIBRARY DESTINATION lib COMPONENT SDK)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 # no -op
 else ()
-	install (TARGETS libzmq RUNTIME DESTINATION bin COMPONENT Runtime)
+  if (CMAKE_HOST_WIN32)
+	install (TARGETS libzmq RUNTIME DESTINATION bin LIBRARY DESTINATION bin COMPONENT Runtime)
 	install (FILES ${CMAKE_BINARY_DIR}/lib/Debug/libzmq${_zmq_TOOLSET}-mt-gd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}.lib DESTINATION lib COMPONENT SDK)
 	install (FILES ${CMAKE_BINARY_DIR}/lib/Debug/libzmq${_zmq_TOOLSET}-mt-gd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}.pdb DESTINATION lib COMPONENT SDK)
 	install (FILES ${CMAKE_BINARY_DIR}/lib/Debug/libzmq${_zmq_TOOLSET}-mt-gd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}.dll DESTINATION bin COMPONENT SDK)
+  endif(CMAKE_HOST_WIN32)
 endif ()
 install (FILES ${headers} DESTINATION include COMPONENT SDK)
 
@@ -302,16 +324,16 @@ set (perf-tools
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 	foreach (perf-tool ${perf-tools})
 		add_executable (${perf-tool} perf/${perf-tool}.cpp)
-		target_link_libraries (${perf-tool} libzmq)
+		target_link_libraries (${perf-tool} libzmq ${EXTRA_LIBS})
 		install (TARGETS ${perf-tool} RUNTIME DESTINATION bin COMPONENT PerfTools)
 	endforeach (perf-tool ${perf-tools})
 endif (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 
-file(GLOB headers "${CMAKE_SOURCE_DIR}/src/*.hpp")
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
 install (FILES ${sources} ${headers} DESTINATION src COMPONENT SourceCode)
 
 foreach (readme ${readme-docs})
-	configure_file (${CMAKE_SOURCE_DIR}/${readme} ${CMAKE_BINARY_DIR}/${readme}.txt)
+	configure_file (${CMAKE_CURRENT_SOURCE_DIR}/${readme} ${CMAKE_BINARY_DIR}/${readme}.txt)
 	install (FILES ${CMAKE_BINARY_DIR}/${readme}.txt DESTINATION .)
 endforeach (readme ${readme-docs})
 if (WITH_DOC)
@@ -324,22 +346,22 @@ if (CMAKE_CL_64)
 	set (CPACK_NSIS_DISPLAY_NAME "ZeroMQ ${ZMQ_VERSION_MAJOR}.${ZMQ_VERSION_MINOR}.${ZMQ_VERSION_PATCH} (x64)")
         set (CPACK_PACKAGE_FILE_NAME "ZeroMQ-${ZMQ_VERSION_MAJOR}.${ZMQ_VERSION_MINOR}.${ZMQ_VERSION_PATCH}-x64")
 	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build/x64/v90;ZeroMQ;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x64/v110;ZeroMQ;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x64/v120;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x64/v90;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x64/v110;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x64/v120;ZeroMQ;ALL;/"
 # default to 2008/Vista compatible CRT
-		"${CMAKE_SOURCE_DIR}/build/x64/v100;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x64/v100;ZeroMQ;ALL;/"
 	)
 else (CMAKE_CL_64)
 	set (CPACK_NSIS_DISPLAY_NAME "ZeroMQ ${ZMQ_VERSION_MAJOR}.${ZMQ_VERSION_MINOR}.${ZMQ_VERSION_PATCH}")
         set (CPACK_PACKAGE_FILE_NAME "ZeroMQ-${ZMQ_VERSION_MAJOR}.${ZMQ_VERSION_MINOR}.${ZMQ_VERSION_PATCH}-x86")
 	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build/x86/v90;ZeroMQ;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x86/v100;ZeroMQ;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x86/v110;ZeroMQ;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x86/v120;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x86/v90;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x86/v100;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x86/v110;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x86/v120;ZeroMQ;ALL;/"
 # default to XP-compatible CRT
-		"${CMAKE_SOURCE_DIR}/build/x86/v110_xp;ZeroMQ;ALL;/"
+		"${CMAKE_CURRENT_SOURCE_DIR}/build/x86/v110_xp;ZeroMQ;ALL;/"
 	)
 endif (CMAKE_CL_64)
 set (CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
@@ -349,9 +371,9 @@ set (CPACK_NSIS_CONTACT "Steven McCoy <Steven.McCoy@miru.hk>")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_BINARY_DIR}/COPYING.txt")
 # There is a bug in NSI that does not handle full unix paths properly. Make
 # sure there is at least one set of four (4) backlasshes.
-set (CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}\\\\installer.ico")
-set (CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}\\\\installer.ico")
-set (CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}\\\\branding.bmp")
+set (CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\installer.ico")
+set (CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\installer.ico")
+set (CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\branding.bmp")
 set (CPACK_NSIS_COMPRESSOR "/SOLID lzma")
 set (CPACK_PACKAGE_VERSION_MAJOR "${ZMQ_VERSION_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${ZMQ_VERSION_MINOR}")
@@ -398,5 +420,12 @@ cpack_add_install_type (DevInstall
 cpack_add_install_type (MinInstall
 	DISPLAY_NAME "Minimal install, runtime only"
 )
+else()
+  if(NOT TARGET  staticzmq3-${CMAKE_SYSTEM_PROCESSOR})
+    add_library(staticzmq3-${CMAKE_SYSTEM_PROCESSOR} STATIC ${sources})
+    set_property(TARGET staticzmq3-${CMAKE_SYSTEM_PROCESSOR} PROPERTY IMPORTED_LINK_INTERFACE_LIBRARIES  rt pthread)
+  endif()
+#  set(EXTRA_LIBS rt pthread)
+endif()
 
 # end of file

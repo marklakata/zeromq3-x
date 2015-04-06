@@ -26,7 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/platform.hpp"
+//#include "../src/platform.hpp"
+#include "platform.hpp"
 
 #if defined ZMQ_HAVE_WINDOWS
 #include <windows.h>

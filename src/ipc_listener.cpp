@@ -120,8 +120,25 @@ int zmq::ipc_listener_t::get_address (std::string &addr_)
 int zmq::ipc_listener_t::set_address (const char *addr_)
 {
     // Allow wildcard file
+    // This was rewritten to avoid tempnam(), which is officially deprecated and emits warnings on linkage with gcc.
+    // This function is slightly better, but a real fix that does not have a race condition would require more work.
+    // Note also that the tempnam() implmentation had a memory leak, as it did not free() the char* buffer.
+    char wildcard_name[32];
     if (*addr_ == '*') {
-        addr_ = tempnam(NULL, NULL);
+        addr_ = wildcard_name;
+        int fh = -1;
+        srand(getpid() * time(NULL));
+        int j;
+        for(j=0;j<100;j++)
+        {
+          int r = rand();
+          sprintf(wildcard_name,"/tmp/zmq_socket_%x",r);
+          fh = ::open(wildcard_name,O_RDWR |O_CREAT|O_EXCL);
+          if (fh >= 0) break;
+          usleep(r % 10000);
+        }
+        if (fh == -1) return -1;
+        ::close(fh);
     }
 
     //  Get rid of the file associated with the UNIX domain socket that

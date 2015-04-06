@@ -96,7 +96,7 @@ int zmq::options_t::setsockopt (int option_, const void *optval_,
             errno = EINVAL;
             return -1;
         }
-        identity_size = optvallen_;
+        identity_size = static_cast<uint8_t>(optvallen_);
         memcpy (identity, optval_, identity_size);
         return 0;
 

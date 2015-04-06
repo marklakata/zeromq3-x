@@ -4,9 +4,9 @@
 
         TRY_RUN(RUN_RESULT COMPILE_RESULT
           ${TRY_RUN_DIR}
-          ${CMAKE_SOURCE_DIR}/cmake/Modules/zmq_version.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/zmq_version.cpp
           CMAKE_FLAGS 
-            "-DINCLUDE_DIRECTORIES:STRING=${CMAKE_SOURCE_DIR}/include"
+            "-DINCLUDE_DIRECTORIES:STRING=${CMAKE_CURRENT_SOURCE_DIR}/include"
           COMPILE_OUTPUT_VARIABLE COMPILE_OUTPUT
           RUN_OUTPUT_VARIABLE RUN_OUTPUT)
 
@@ -24,6 +24,7 @@
           MESSAGE(STATUS "Detecting ZMQ - failed")
         ENDIF()
 
+		
   if(CMAKE_GENERATOR_TOOLSET MATCHES "v120")
     set(_zmq_TOOLSET "-v120")
     set(_zmq_COMPILER "vc120")
@@ -56,4 +57,5 @@
     set(_zmq_TOOLSET "")
     set(_zmq_COMPILER "")
     set(_zmq_WIN32_WINNT "")
+	message(ERROR "Use the -T option to cmake to pick a valid setting for CMAKE_GENERATOR_TOOLSET")
   endif()
