@@ -284,8 +284,6 @@ endforeach (txt ${docs})
 #-----------------------------------------------------------------------------
 # output
 
-message(targetting ${_zmq_TOOLSET})
-
 if (CMAKE_HOST_WIN32 AND NOT TARGET libzmq)
   add_library(libzmq SHARED ${sources} ${html-docs} ${CMAKE_BINARY_DIR}/NSIS.template.in)
   target_link_libraries(libzmq ws2_32.lib rpcrt4.lib ${OPTIONAL_LIBRARIES})
